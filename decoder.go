@@ -2,6 +2,7 @@ package json
 
 import (
 	"encoding/json"
+	"io"
 )
 
 type (
@@ -15,11 +16,35 @@ type Decoder struct {
 	arrmaker ArrayMaker
 }
 
+func NewDecoderStandard(reader io.Reader) *Decoder {
+	return &Decoder{
+		reader:   json.NewDecoder(reader),
+		objmaker: newObject,
+		arrmaker: newArray,
+	}
+}
+
+func NewDecoderStandardCustom(reader io.Reader, objmaker ObjectMaker, arrmaker ArrayMaker) *Decoder {
+	return &Decoder{
+		reader:   json.NewDecoder(reader),
+		objmaker: objmaker,
+		arrmaker: arrmaker,
+	}
+}
+
 func NewDecoder(reader TokenReader) *Decoder {
 	return &Decoder{
 		reader:   reader,
 		objmaker: newObject,
 		arrmaker: newArray,
+	}
+}
+
+func NewDecoderCustom(reader TokenReader, objmaker ObjectMaker, arrmaker ArrayMaker) *Decoder {
+	return &Decoder{
+		reader:   reader,
+		objmaker: objmaker,
+		arrmaker: arrmaker,
 	}
 }
 
