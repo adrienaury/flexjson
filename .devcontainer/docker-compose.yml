@@ -3,7 +3,7 @@ version: "3.7"
 services:
   vscode:
     build:
-      context: .devcontainer
+      context: .
       args:
         http_proxy: ${http_proxy}
         https_proxy: ${https_proxy}
@@ -20,7 +20,7 @@ services:
 
   ci:
     build:
-      context: .devcontainer
+      context: .
       dockerfile: Dockerfile.ci
     user: root
     volumes:
