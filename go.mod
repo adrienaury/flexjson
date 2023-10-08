@@ -1,4 +1,4 @@
-module github.com/adrienaury/go-template
+module github.com/adrienaury/ordered-json
 
 go 1.21
 
