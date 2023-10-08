@@ -1,33 +1,13 @@
-package v2
+package json
 
 import (
 	"encoding/json"
-
-	"github.com/7sDream/geko"
-)
-
-type Object interface {
-	Add(key string, value any)
-}
-
-type Array interface {
-	Append(value ...any)
-}
-
-type (
-	ObjectMaker func() Object
-	ArrayMaker  func() Array
 )
 
 type (
 	Token = json.Token
 	Delim = json.Delim
 )
-
-type TokenReader interface {
-	More() bool
-	Token() (Token, error)
-}
 
 type Decoder struct {
 	reader   TokenReader
@@ -37,13 +17,9 @@ type Decoder struct {
 
 func NewDecoder(reader TokenReader) *Decoder {
 	return &Decoder{
-		reader: reader,
-		objmaker: func() Object {
-			return geko.NewMap[string, any]()
-		},
-		arrmaker: func() Array {
-			return geko.NewList[any]()
-		},
+		reader:   reader,
+		objmaker: newObject,
+		arrmaker: newArray,
 	}
 }
 
@@ -55,22 +31,22 @@ func (d *Decoder) Decode() any {
 
 	delim, isDelim := token.(Delim)
 
+	var result any
+
 	switch {
 	case isDelim && delim == Delim('{'):
-		result := d.DecodeObject()
+		result = d.DecodeObject()
 		d.assertNextToken('}')
-
-		return result
 	case isDelim && delim == Delim('['):
-		result := d.DecodeArray()
+		result = d.DecodeArray()
 		d.assertNextToken(']')
-
-		return result
 	case isDelim:
-		panic("unexpected token" + string(delim))
+		panic("unexpected token " + string(delim))
 	default:
-		return token
+		result = token
 	}
+
+	return result
 }
 
 func (d *Decoder) DecodeObject() Object { //nolint:ireturn
@@ -102,25 +78,7 @@ func (d *Decoder) decodeKeyValue(obj Object) {
 		panic("invalid key")
 	}
 
-	value, err := d.reader.Token()
-	if err != nil {
-		panic(err)
-	}
-
-	delim, isDelim := value.(Delim)
-
-	switch {
-	case isDelim && delim == Delim('{'):
-		obj.Add(keystr, d.DecodeObject())
-		d.assertNextToken('}')
-	case isDelim && delim == Delim('['):
-		obj.Add(keystr, d.DecodeArray())
-		d.assertNextToken(']')
-	case isDelim:
-		panic("unexpected token " + string(delim))
-	default:
-		obj.Add(keystr, value)
-	}
+	obj.Add(keystr, d.Decode())
 }
 
 func (d *Decoder) assertNextToken(is rune) {
