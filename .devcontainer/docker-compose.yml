@@ -9,7 +9,7 @@ services:
         https_proxy: ${https_proxy}
         no_proxy: ${no_proxy}
     volumes:
-      - ./:/workspace
+      - ../:/workspace
       - ~/.ssh:/home/vscode/.ssh:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
     cap_add:
@@ -24,7 +24,7 @@ services:
       dockerfile: Dockerfile.ci
     user: root
     volumes:
-      - ./:/workspace
+      - ../:/workspace
       - ~/.ssh:/home/vscode/.ssh:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
     security_opt:
