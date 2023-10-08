@@ -26,6 +26,9 @@ import (
 	"fmt"
 	"os"
 
+	v1 "github.com/adrienaury/ordered-json/pkg/v1"
+	"github.com/goccy/go-json"
+	"github.com/kr/pretty"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
@@ -45,5 +48,12 @@ func main() {
 
 	log.Info().Msgf("%v %v (commit=%v date=%v by=%v)", name, version, commit, buildDate, builtBy)
 
-	fmt.Println()
+	decoder := json.NewDecoder(os.Stdin)
+
+	result, err := v1.Decode(decoder)
+	if err != nil {
+		log.Fatal().Err(err).Msg("error")
+	}
+
+	fmt.Printf("%# v\n", pretty.Formatter(result))
 }
