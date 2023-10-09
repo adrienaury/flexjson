@@ -1,11 +1,17 @@
 package json
 
-type StrategyObject[T any] struct {
-	Make func() T
-	Add  func(obj T, key string, value any)
+type (
+	Maker[T any] func() T
+	Adder[T any] func(arr T, value any) T
+	Keyer[T any] func(obj T, key string, value any) T
+)
+
+type ObjectStrategy[T any] interface {
+	Make() T
+	Add(obj T, key string, value any) T
 }
 
-type StrategyArray[T any] struct {
-	Make func() T
-	Add  func(arr T, value any)
+type ArrayStrategy[T any] interface {
+	Make() T
+	Add(obj T, value any) T
 }

@@ -12,16 +12,24 @@ type (
 
 type Decoder[O any, A any] struct {
 	reader      TokenReader
-	objStrategy StrategyObject[O]
-	arrStrategy StrategyArray[A]
+	objStrategy ObjectStrategy[O]
+	arrStrategy ArrayStrategy[A]
 }
 
 func NewDecoder(reader io.Reader) *Decoder[Object, Array] {
 	return &Decoder[Object, Array]{
 		reader:      json.NewDecoder(reader),
-		objStrategy: DefaultObjectStrategy,
-		arrStrategy: DefaultArrayStrategy,
+		objStrategy: NewStandardObjectStrategy(),
+		arrStrategy: NewStandardArrayStrategy(),
 	}
+}
+
+func (d *Decoder[O, A]) WithObjectStrategy(objStrategy ObjectStrategy[O]) {
+	d.objStrategy = objStrategy
+}
+
+func (d *Decoder[O, A]) WithArrayStrategy(arrStrategy ArrayStrategy[A]) {
+	d.arrStrategy = arrStrategy
 }
 
 func (d *Decoder[O, A]) Decode() any {
@@ -53,7 +61,7 @@ func (d *Decoder[O, A]) Decode() any {
 func (d *Decoder[O, A]) DecodeObject() O { //nolint:ireturn
 	object := d.objStrategy.Make()
 	for d.reader.More() {
-		d.decodeKeyValue(object)
+		object = d.decodeKeyValue(object)
 	}
 
 	return object
@@ -62,13 +70,13 @@ func (d *Decoder[O, A]) DecodeObject() O { //nolint:ireturn
 func (d *Decoder[O, A]) DecodeArray() A { //nolint:ireturn
 	array := d.arrStrategy.Make()
 	for d.reader.More() {
-		d.arrStrategy.Add(array, d.Decode())
+		array = d.arrStrategy.Add(array, d.Decode())
 	}
 
 	return array
 }
 
-func (d *Decoder[O, A]) decodeKeyValue(obj O) {
+func (d *Decoder[O, A]) decodeKeyValue(obj O) O { //nolint:ireturn
 	key, err := d.reader.Token()
 	if err != nil {
 		panic(err)
@@ -79,7 +87,7 @@ func (d *Decoder[O, A]) decodeKeyValue(obj O) {
 		panic("invalid key")
 	}
 
-	d.objStrategy.Add(obj, keystr, d.Decode())
+	return d.objStrategy.Add(obj, keystr, d.Decode())
 }
 
 func (d *Decoder[O, A]) assertNextToken(is rune) {
