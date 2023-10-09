@@ -10,45 +10,21 @@ type (
 	Delim = json.Delim
 )
 
-type Decoder struct {
-	reader   TokenReader
-	objmaker ObjectMaker
-	arrmaker ArrayMaker
+type Decoder[O any, A any] struct {
+	reader      TokenReader
+	objStrategy StrategyObject[O]
+	arrStrategy StrategyArray[A]
 }
 
-func NewDecoderStandard(reader io.Reader) *Decoder {
-	return &Decoder{
-		reader:   json.NewDecoder(reader),
-		objmaker: newObject,
-		arrmaker: newArray,
+func NewDecoder(reader io.Reader) *Decoder[Object, Array] {
+	return &Decoder[Object, Array]{
+		reader:      json.NewDecoder(reader),
+		objStrategy: DefaultObjectStrategy,
+		arrStrategy: DefaultArrayStrategy,
 	}
 }
 
-func NewDecoderStandardCustom(reader io.Reader, objmaker ObjectMaker, arrmaker ArrayMaker) *Decoder {
-	return &Decoder{
-		reader:   json.NewDecoder(reader),
-		objmaker: objmaker,
-		arrmaker: arrmaker,
-	}
-}
-
-func NewDecoder(reader TokenReader) *Decoder {
-	return &Decoder{
-		reader:   reader,
-		objmaker: newObject,
-		arrmaker: newArray,
-	}
-}
-
-func NewDecoderCustom(reader TokenReader, objmaker ObjectMaker, arrmaker ArrayMaker) *Decoder {
-	return &Decoder{
-		reader:   reader,
-		objmaker: objmaker,
-		arrmaker: arrmaker,
-	}
-}
-
-func (d *Decoder) Decode() any {
+func (d *Decoder[O, A]) Decode() any {
 	token, err := d.reader.Token()
 	if err != nil {
 		panic(err)
@@ -74,8 +50,8 @@ func (d *Decoder) Decode() any {
 	return result
 }
 
-func (d *Decoder) DecodeObject() Object { //nolint:ireturn
-	object := d.objmaker()
+func (d *Decoder[O, A]) DecodeObject() O { //nolint:ireturn
+	object := d.objStrategy.Make()
 	for d.reader.More() {
 		d.decodeKeyValue(object)
 	}
@@ -83,16 +59,16 @@ func (d *Decoder) DecodeObject() Object { //nolint:ireturn
 	return object
 }
 
-func (d *Decoder) DecodeArray() Array { //nolint:ireturn
-	array := d.arrmaker()
+func (d *Decoder[O, A]) DecodeArray() A { //nolint:ireturn
+	array := d.arrStrategy.Make()
 	for d.reader.More() {
-		array.Append(d.Decode())
+		d.arrStrategy.Add(array, d.Decode())
 	}
 
 	return array
 }
 
-func (d *Decoder) decodeKeyValue(obj Object) {
+func (d *Decoder[O, A]) decodeKeyValue(obj O) {
 	key, err := d.reader.Token()
 	if err != nil {
 		panic(err)
@@ -103,10 +79,10 @@ func (d *Decoder) decodeKeyValue(obj Object) {
 		panic("invalid key")
 	}
 
-	obj.Add(keystr, d.Decode())
+	d.objStrategy.Add(obj, keystr, d.Decode())
 }
 
-func (d *Decoder) assertNextToken(is rune) {
+func (d *Decoder[O, A]) assertNextToken(is rune) {
 	if token, err := d.reader.Token(); err != nil {
 		panic(err)
 	} else if delim, isDelim := token.(Delim); !isDelim {

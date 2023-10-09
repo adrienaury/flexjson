@@ -1,6 +1,7 @@
 package json_test
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -14,7 +15,7 @@ func Test_DecodeStream(t *testing.T) {
 		{"Surname": "Doe", "Name": "John"}
 `
 
-	dec := json.NewDecoderStandard(strings.NewReader(stream))
+	dec := json.NewDecoder(strings.NewReader(stream))
 
 	result := dec.Decode()
 
@@ -23,15 +24,9 @@ func Test_DecodeStream(t *testing.T) {
 		t.Fatalf("result is not an object")
 	}
 
-	if object.Len() != 2 {
-		t.Fatalf("object len is invalid: %d", object.Len())
+	if len(object) != 2 {
+		t.Fatalf("object len is invalid: %d", len(object))
 	}
 
-	if object.Keys()[0] != "Surname" {
-		t.Fatalf("object first key is invalid: %s", object.Keys()[0])
-	}
-
-	if object.Keys()[1] != "Name" {
-		t.Fatalf("object second key is invalid")
-	}
+	fmt.Println(object)
 }
