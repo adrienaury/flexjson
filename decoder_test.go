@@ -12,10 +12,10 @@ func Test_DecodeStream(t *testing.T) {
 	t.Parallel()
 
 	const stream = `
-		{"Surname": "Doe", "Name": "John"}
+		{"Surname": "Doe", "Name": "John", "Friends": [{"Surname": "Wizz", "Name": "Pat"}]}
 `
 
-	dec := json.NewDecoder(strings.NewReader(stream))
+	dec := json.NewDecoderStandard(strings.NewReader(stream))
 
 	result := dec.Decode()
 
@@ -24,7 +24,7 @@ func Test_DecodeStream(t *testing.T) {
 		t.Fatalf("result is not an object")
 	}
 
-	if len(object) != 2 {
+	if len(object) != 3 {
 		t.Fatalf("object len is invalid: %d", len(object))
 	}
 

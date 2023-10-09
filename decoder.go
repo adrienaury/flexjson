@@ -16,11 +16,19 @@ type Decoder[O any, A any] struct {
 	arrStrategy ArrayStrategy[A]
 }
 
-func NewDecoder(reader io.Reader) *Decoder[Object, Array] {
+func NewDecoderStandard(reader io.Reader) *Decoder[Object, Array] {
 	return &Decoder[Object, Array]{
 		reader:      json.NewDecoder(reader),
 		objStrategy: NewStandardObjectStrategy(),
 		arrStrategy: NewStandardArrayStrategy(),
+	}
+}
+
+func NewDecoder[O any, A any](reader TokenReader) *Decoder[O, A] {
+	return &Decoder[O, A]{
+		reader:      reader,
+		objStrategy: nil,
+		arrStrategy: nil,
 	}
 }
 
