@@ -1,37 +1,32 @@
-package json_test
+package flexjson_test
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
-	json "github.com/adrienaury/ordered-json"
+	"github.com/adrienaury/flexjson"
 )
 
-func Test_DecodeStream(t *testing.T) {
+func TestDecodeStream(t *testing.T) {
 	t.Parallel()
 
 	const stream = `
-		{"Surname": "Doe", "Name": "John"}
+		{"Surname": "Doe", "Name": "John", "Friends": [{"Surname": "Wizz", "Name": "Pat"}]}
 `
 
-	dec := json.NewDecoderStandard(strings.NewReader(stream))
+	dec := flexjson.NewDecoder(strings.NewReader(stream))
 
 	result := dec.Decode()
 
-	object, ok := result.(json.Object)
+	object, ok := result.(flexjson.Object)
 	if !ok {
 		t.Fatalf("result is not an object")
 	}
 
-	if object.Len() != 2 {
-		t.Fatalf("object len is invalid: %d", object.Len())
+	if len(object) != 3 {
+		t.Fatalf("object len is invalid: %d", len(object))
 	}
 
-	if object.Keys()[0] != "Surname" {
-		t.Fatalf("object first key is invalid: %s", object.Keys()[0])
-	}
-
-	if object.Keys()[1] != "Name" {
-		t.Fatalf("object second key is invalid")
-	}
+	fmt.Println(object)
 }

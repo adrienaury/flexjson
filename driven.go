@@ -1,23 +1,9 @@
-package json
-
-type Object interface {
-	Add(key string, value any)
-	Get(key string) (any, bool)
-	Has(key string) bool
-	Len() int
-	Keys() []string
-	Value() []any
-}
-
-type Array interface {
-	Append(value any)
-	Get(index int) any
-	Len() int
-}
+package flexjson
 
 type (
-	ObjectMaker func() Object
-	ArrayMaker  func() Array
+	Maker[T any] func() T
+	Adder[T any] func(arr T, value any) T
+	Keyer[T any] func(obj T, key string, value any) T
 )
 
 type TokenReader interface {

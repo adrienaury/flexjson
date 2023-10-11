@@ -1,4 +1,4 @@
-package json
+package flexjson
 
 import (
 	"encoding/json"
@@ -10,45 +10,41 @@ type (
 	Delim = json.Delim
 )
 
-type Decoder struct {
+type Decoder[O any, A any] struct {
 	reader   TokenReader
-	objmaker ObjectMaker
-	arrmaker ArrayMaker
+	objMaker Maker[O]
+	objKeyer Keyer[O]
+	arrMaker Maker[A]
+	arrAdder Adder[A]
 }
 
-func NewDecoderStandard(reader io.Reader) *Decoder {
-	return &Decoder{
+func NewDecoder(reader io.Reader) *Decoder[Object, Array] {
+	return &Decoder[Object, Array]{
 		reader:   json.NewDecoder(reader),
-		objmaker: newObject,
-		arrmaker: newArray,
+		objMaker: StandardObjectMaker(),
+		objKeyer: StandardObjectAdder(),
+		arrMaker: StandardArrayMaker(),
+		arrAdder: StandardArrayAdder(),
 	}
 }
 
-func NewDecoderStandardCustom(reader io.Reader, objmaker ObjectMaker, arrmaker ArrayMaker) *Decoder {
-	return &Decoder{
-		reader:   json.NewDecoder(reader),
-		objmaker: objmaker,
-		arrmaker: arrmaker,
-	}
-}
-
-func NewDecoder(reader TokenReader) *Decoder {
-	return &Decoder{
+func NewFlexDecoder[O any, A any](
+	reader TokenReader,
+	objMaker Maker[O],
+	objKeyer Keyer[O],
+	arrMaker Maker[A],
+	arrAdder Adder[A],
+) *Decoder[O, A] {
+	return &Decoder[O, A]{
 		reader:   reader,
-		objmaker: newObject,
-		arrmaker: newArray,
+		objMaker: objMaker,
+		objKeyer: objKeyer,
+		arrMaker: arrMaker,
+		arrAdder: arrAdder,
 	}
 }
 
-func NewDecoderCustom(reader TokenReader, objmaker ObjectMaker, arrmaker ArrayMaker) *Decoder {
-	return &Decoder{
-		reader:   reader,
-		objmaker: objmaker,
-		arrmaker: arrmaker,
-	}
-}
-
-func (d *Decoder) Decode() any {
+func (d *Decoder[O, A]) Decode() any {
 	token, err := d.reader.Token()
 	if err != nil {
 		panic(err)
@@ -60,10 +56,10 @@ func (d *Decoder) Decode() any {
 
 	switch {
 	case isDelim && delim == Delim('{'):
-		result = d.DecodeObject()
+		result = d.decodeObject()
 		d.assertNextToken('}')
 	case isDelim && delim == Delim('['):
-		result = d.DecodeArray()
+		result = d.decodeArray()
 		d.assertNextToken(']')
 	case isDelim:
 		panic("unexpected token " + string(delim))
@@ -74,25 +70,24 @@ func (d *Decoder) Decode() any {
 	return result
 }
 
-func (d *Decoder) DecodeObject() Object { //nolint:ireturn
-	object := d.objmaker()
+func (d *Decoder[O, A]) DecodeObject() O { //nolint:ireturn
+	d.assertNextToken('{')
+
+	defer d.assertNextToken('}')
+
+	return d.decodeObject()
+}
+
+func (d *Decoder[O, A]) decodeObject() O { //nolint:ireturn
+	object := d.objMaker()
 	for d.reader.More() {
-		d.decodeKeyValue(object)
+		object = d.decodeKeyValue(object)
 	}
 
 	return object
 }
 
-func (d *Decoder) DecodeArray() Array { //nolint:ireturn
-	array := d.arrmaker()
-	for d.reader.More() {
-		array.Append(d.Decode())
-	}
-
-	return array
-}
-
-func (d *Decoder) decodeKeyValue(obj Object) {
+func (d *Decoder[O, A]) decodeKeyValue(obj O) O { //nolint:ireturn
 	key, err := d.reader.Token()
 	if err != nil {
 		panic(err)
@@ -103,14 +98,31 @@ func (d *Decoder) decodeKeyValue(obj Object) {
 		panic("invalid key")
 	}
 
-	obj.Add(keystr, d.Decode())
+	return d.objKeyer(obj, keystr, d.Decode())
 }
 
-func (d *Decoder) assertNextToken(is rune) {
+func (d *Decoder[O, A]) DecodeArray() A { //nolint:ireturn
+	d.assertNextToken('[')
+
+	defer d.assertNextToken(']')
+
+	return d.decodeArray()
+}
+
+func (d *Decoder[O, A]) decodeArray() A { //nolint:ireturn
+	array := d.arrMaker()
+	for d.reader.More() {
+		array = d.arrAdder(array, d.Decode())
+	}
+
+	return array
+}
+
+func (d *Decoder[O, A]) assertNextToken(is rune) {
 	if token, err := d.reader.Token(); err != nil {
 		panic(err)
 	} else if delim, isDelim := token.(Delim); !isDelim {
-		panic("unexpected token")
+		panic("unexpected token " + string(delim))
 	} else if delim != Delim(is) {
 		panic("unexpected token " + string(delim))
 	}
