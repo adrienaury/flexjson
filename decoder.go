@@ -1,4 +1,4 @@
-package json
+package flexjson
 
 import (
 	"encoding/json"
@@ -11,33 +11,31 @@ type (
 )
 
 type Decoder[O any, A any] struct {
-	reader      TokenReader
-	objStrategy ObjectStrategy[O]
-	arrStrategy ArrayStrategy[A]
+	reader   TokenReader
+	objMaker Maker[O]
+	objKeyer Keyer[O]
+	arrMaker Maker[A]
+	arrAdder Adder[A]
 }
 
 func NewDecoderStandard(reader io.Reader) *Decoder[Object, Array] {
 	return &Decoder[Object, Array]{
-		reader:      json.NewDecoder(reader),
-		objStrategy: NewStandardObjectStrategy(),
-		arrStrategy: NewStandardArrayStrategy(),
+		reader:   json.NewDecoder(reader),
+		objMaker: StandardObjectMaker(),
+		objKeyer: StandardObjectAdder(),
+		arrMaker: StandardArrayMaker(),
+		arrAdder: StandardArrayAdder(),
 	}
 }
 
-func NewDecoder[O any, A any](reader TokenReader) *Decoder[O, A] {
+func NewDecoder[O any, A any](r TokenReader, om Maker[O], ok Keyer[O], am Maker[A], aadd Adder[A]) *Decoder[O, A] {
 	return &Decoder[O, A]{
-		reader:      reader,
-		objStrategy: nil,
-		arrStrategy: nil,
+		reader:   r,
+		objMaker: om,
+		objKeyer: ok,
+		arrMaker: am,
+		arrAdder: aadd,
 	}
-}
-
-func (d *Decoder[O, A]) WithObjectStrategy(objStrategy ObjectStrategy[O]) {
-	d.objStrategy = objStrategy
-}
-
-func (d *Decoder[O, A]) WithArrayStrategy(arrStrategy ArrayStrategy[A]) {
-	d.arrStrategy = arrStrategy
 }
 
 func (d *Decoder[O, A]) Decode() any {
@@ -67,7 +65,7 @@ func (d *Decoder[O, A]) Decode() any {
 }
 
 func (d *Decoder[O, A]) DecodeObject() O { //nolint:ireturn
-	object := d.objStrategy.Make()
+	object := d.objMaker()
 	for d.reader.More() {
 		object = d.decodeKeyValue(object)
 	}
@@ -76,9 +74,9 @@ func (d *Decoder[O, A]) DecodeObject() O { //nolint:ireturn
 }
 
 func (d *Decoder[O, A]) DecodeArray() A { //nolint:ireturn
-	array := d.arrStrategy.Make()
+	array := d.arrMaker()
 	for d.reader.More() {
-		array = d.arrStrategy.Add(array, d.Decode())
+		array = d.arrAdder(array, d.Decode())
 	}
 
 	return array
@@ -95,7 +93,7 @@ func (d *Decoder[O, A]) decodeKeyValue(obj O) O { //nolint:ireturn
 		panic("invalid key")
 	}
 
-	return d.objStrategy.Add(obj, keystr, d.Decode())
+	return d.objKeyer(obj, keystr, d.Decode())
 }
 
 func (d *Decoder[O, A]) assertNextToken(is rune) {
