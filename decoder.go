@@ -18,7 +18,7 @@ type Decoder[O any, A any] struct {
 	arrAdder Adder[A]
 }
 
-func NewDecoderStandard(reader io.Reader) *Decoder[Object, Array] {
+func NewDecoder(reader io.Reader) *Decoder[Object, Array] {
 	return &Decoder[Object, Array]{
 		reader:   json.NewDecoder(reader),
 		objMaker: StandardObjectMaker(),
@@ -28,13 +28,19 @@ func NewDecoderStandard(reader io.Reader) *Decoder[Object, Array] {
 	}
 }
 
-func NewDecoder[O any, A any](r TokenReader, om Maker[O], ok Keyer[O], am Maker[A], aadd Adder[A]) *Decoder[O, A] {
+func NewFlexDecoder[O any, A any](
+	reader TokenReader,
+	objMaker Maker[O],
+	objKeyer Keyer[O],
+	arrMaker Maker[A],
+	arrAdder Adder[A],
+) *Decoder[O, A] {
 	return &Decoder[O, A]{
-		reader:   r,
-		objMaker: om,
-		objKeyer: ok,
-		arrMaker: am,
-		arrAdder: aadd,
+		reader:   reader,
+		objMaker: objMaker,
+		objKeyer: objKeyer,
+		arrMaker: arrMaker,
+		arrAdder: arrAdder,
 	}
 }
 
@@ -50,10 +56,10 @@ func (d *Decoder[O, A]) Decode() any {
 
 	switch {
 	case isDelim && delim == Delim('{'):
-		result = d.DecodeObject()
+		result = d.decodeObject()
 		d.assertNextToken('}')
 	case isDelim && delim == Delim('['):
-		result = d.DecodeArray()
+		result = d.decodeArray()
 		d.assertNextToken(']')
 	case isDelim:
 		panic("unexpected token " + string(delim))
@@ -65,21 +71,20 @@ func (d *Decoder[O, A]) Decode() any {
 }
 
 func (d *Decoder[O, A]) DecodeObject() O { //nolint:ireturn
+	d.assertNextToken('{')
+
+	defer d.assertNextToken('}')
+
+	return d.decodeObject()
+}
+
+func (d *Decoder[O, A]) decodeObject() O { //nolint:ireturn
 	object := d.objMaker()
 	for d.reader.More() {
 		object = d.decodeKeyValue(object)
 	}
 
 	return object
-}
-
-func (d *Decoder[O, A]) DecodeArray() A { //nolint:ireturn
-	array := d.arrMaker()
-	for d.reader.More() {
-		array = d.arrAdder(array, d.Decode())
-	}
-
-	return array
 }
 
 func (d *Decoder[O, A]) decodeKeyValue(obj O) O { //nolint:ireturn
@@ -96,11 +101,28 @@ func (d *Decoder[O, A]) decodeKeyValue(obj O) O { //nolint:ireturn
 	return d.objKeyer(obj, keystr, d.Decode())
 }
 
+func (d *Decoder[O, A]) DecodeArray() A { //nolint:ireturn
+	d.assertNextToken('[')
+
+	defer d.assertNextToken(']')
+
+	return d.decodeArray()
+}
+
+func (d *Decoder[O, A]) decodeArray() A { //nolint:ireturn
+	array := d.arrMaker()
+	for d.reader.More() {
+		array = d.arrAdder(array, d.Decode())
+	}
+
+	return array
+}
+
 func (d *Decoder[O, A]) assertNextToken(is rune) {
 	if token, err := d.reader.Token(); err != nil {
 		panic(err)
 	} else if delim, isDelim := token.(Delim); !isDelim {
-		panic("unexpected token")
+		panic("unexpected token " + string(delim))
 	} else if delim != Delim(is) {
 		panic("unexpected token " + string(delim))
 	}

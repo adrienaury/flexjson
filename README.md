@@ -21,7 +21,7 @@ type (
 )
 
 func main() {
-	dec := flexjson.NewDecoder(
+	dec := flexjson.NewFlexDecoder(
 		json.NewDecoder(os.Stdin),
 		func() Object { return orderedmap.New[string, any]() },
 		func(obj Object, key string, value any) Object {

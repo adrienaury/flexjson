@@ -15,7 +15,7 @@ func TestDecodeStream(t *testing.T) {
 		{"Surname": "Doe", "Name": "John", "Friends": [{"Surname": "Wizz", "Name": "Pat"}]}
 `
 
-	dec := flexjson.NewDecoderStandard(strings.NewReader(stream))
+	dec := flexjson.NewDecoder(strings.NewReader(stream))
 
 	result := dec.Decode()
 
