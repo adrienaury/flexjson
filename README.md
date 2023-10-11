@@ -1,4 +1,4 @@
-# Ordered JSON
+# Flex JSON
 
 Parse semi-structured JSON (i.e. data that can't be mapped to a known structure) in a streaming manner, and decide what types will be used to parse objects and arrays.
 
