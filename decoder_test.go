@@ -17,7 +17,10 @@ func TestDecodeStream(t *testing.T) {
 
 	dec := flexjson.NewDecoder(strings.NewReader(stream))
 
-	result := dec.Decode()
+	result, err := dec.Decode()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	object, ok := result.(flexjson.Object)
 	if !ok {

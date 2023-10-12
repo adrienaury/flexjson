@@ -2,6 +2,7 @@ package flexjson
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 )
 
@@ -44,86 +45,149 @@ func NewFlexDecoder[O any, A any](
 	}
 }
 
-func (d *Decoder[O, A]) Decode() any {
+func (d *Decoder[O, A]) Decode() (any, error) {
 	token, err := d.reader.Token()
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("%w", err)
 	}
 
 	delim, isDelim := token.(Delim)
 
-	var result any
-
 	switch {
 	case isDelim && delim == Delim('{'):
-		result = d.decodeObject()
-		d.assertNextToken('}')
+		result, err := d.decodeObject()
+		if err != nil {
+			return result, err
+		}
+
+		return d.closeObject(result)
 	case isDelim && delim == Delim('['):
-		result = d.decodeArray()
-		d.assertNextToken(']')
+		result, err := d.decodeArray()
+		if err != nil {
+			return result, err
+		}
+
+		return d.closeArray(result)
 	case isDelim:
-		panic("unexpected token " + string(delim))
-	default:
-		result = token
+		return nil, fmt.Errorf("%w %s", ErrUnexpectedToken, string(delim))
 	}
 
-	return result
+	return token, nil
 }
 
-func (d *Decoder[O, A]) DecodeObject() O { //nolint:ireturn
-	d.assertNextToken('{')
+func (d *Decoder[O, A]) DecodeObject() (O, error) { //nolint:ireturn
+	if err := d.assertNextToken('{'); err != nil {
+		return *new(O), err
+	}
 
-	defer d.assertNextToken('}')
+	result, err := d.decodeObject()
+	if err != nil {
+		return result, err
+	}
 
-	return d.decodeObject()
+	return d.closeObject(result)
 }
 
-func (d *Decoder[O, A]) decodeObject() O { //nolint:ireturn
-	object := d.objMaker()
+func (d *Decoder[O, A]) decodeObject() (O, error) { //nolint:ireturn
+	object, err := d.objMaker()
+	if err != nil {
+		return object, err
+	}
+
 	for d.reader.More() {
-		object = d.decodeKeyValue(object)
+		if object, err = d.decodeKeyValue(object); err != nil {
+			return object, err
+		}
 	}
 
-	return object
+	return object, nil
 }
 
-func (d *Decoder[O, A]) decodeKeyValue(obj O) O { //nolint:ireturn
+func (d *Decoder[O, A]) decodeKeyValue(obj O) (O, error) { //nolint:ireturn
 	key, err := d.reader.Token()
 	if err != nil {
-		panic(err)
+		return obj, fmt.Errorf("%w", err)
 	}
 
 	keystr, keyIsString := key.(string)
 	if !keyIsString {
-		panic("invalid key")
+		return obj, fmt.Errorf("%w %T", ErrInvalidKeyType, key)
 	}
 
-	return d.objKeyer(obj, keystr, d.Decode())
+	result, err := d.Decode()
+	if err != nil {
+		return obj, err
+	}
+
+	return d.objKeyer(obj, keystr, result)
 }
 
-func (d *Decoder[O, A]) DecodeArray() A { //nolint:ireturn
-	d.assertNextToken('[')
+func (d *Decoder[O, A]) DecodeArray() (A, error) { //nolint:ireturn
+	if err := d.assertNextToken('['); err != nil {
+		return *new(A), err
+	}
 
-	defer d.assertNextToken(']')
+	array, err := d.decodeArray()
+	if err != nil {
+		return array, err
+	}
 
-	return d.decodeArray()
+	return d.closeArray(array)
 }
 
-func (d *Decoder[O, A]) decodeArray() A { //nolint:ireturn
-	array := d.arrMaker()
+func (d *Decoder[O, A]) decodeArray() (A, error) { //nolint:ireturn
+	array, err := d.arrMaker()
+	if err != nil {
+		return array, err
+	}
+
 	for d.reader.More() {
-		array = d.arrAdder(array, d.Decode())
+		item, err := d.Decode()
+		if err != nil {
+			return array, err
+		}
+
+		array, err = d.arrAdder(array, item)
+		if err != nil {
+			return array, err
+		}
 	}
 
-	return array
+	return array, nil
 }
 
-func (d *Decoder[O, A]) assertNextToken(is rune) {
+func (d *Decoder[O, A]) assertNextToken(is rune) error {
 	if token, err := d.reader.Token(); err != nil {
-		panic(err)
+		return fmt.Errorf("%w", err)
 	} else if delim, isDelim := token.(Delim); !isDelim {
-		panic("unexpected token " + string(delim))
+		return fmt.Errorf("%w %s", ErrUnexpectedToken, string(delim))
 	} else if delim != Delim(is) {
-		panic("unexpected token " + string(delim))
+		return fmt.Errorf("%w %s", ErrUnexpectedToken, string(delim))
 	}
+
+	return nil
+}
+
+func (d *Decoder[O, A]) closeObject(obj O) (O, error) { //nolint:ireturn
+	if token, err := d.reader.Token(); err != nil {
+		return obj, fmt.Errorf("%w", err)
+	} else if delim, isDelim := token.(Delim); !isDelim {
+		return obj, fmt.Errorf("%w %s", ErrUnexpectedToken, string(delim))
+	} else if delim != Delim('}') {
+		return obj, fmt.Errorf("%w %s", ErrUnexpectedToken, string(delim))
+	}
+
+	return obj, nil
+}
+
+func (d *Decoder[O, A]) closeArray(arr A) (A, error) { //nolint:ireturn
+	if token, err := d.reader.Token(); err != nil {
+		return arr, fmt.Errorf("%w", err)
+	} else if delim, isDelim := token.(Delim); !isDelim {
+		return arr, fmt.Errorf("%w %s", ErrUnexpectedToken, string(delim))
+	} else if delim != Delim(']') {
+		return arr, fmt.Errorf("%w %s", ErrUnexpectedToken, string(delim))
+	}
+
+	return arr, nil
 }
