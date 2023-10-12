@@ -6,21 +6,21 @@ type (
 )
 
 func StandardObjectMaker() Maker[Object] {
-	return func() Object { return make(Object) }
+	return func() (Object, error) { return make(Object), nil }
 }
 
 func StandardObjectAdder() Keyer[Object] {
-	return func(obj Object, key string, value any) Object {
+	return func(obj Object, key string, value any) (Object, error) {
 		obj[key] = value
 
-		return obj
+		return obj, nil
 	}
 }
 
 func StandardArrayMaker() Maker[Array] {
-	return func() Array { return make(Array, 0) }
+	return func() (Array, error) { return make(Array, 0), nil }
 }
 
 func StandardArrayAdder() Adder[Array] {
-	return func(arr Array, value any) Array { return append(arr, value) }
+	return func(arr Array, value any) (Array, error) { return append(arr, value), nil }
 }
